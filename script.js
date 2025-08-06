@@ -144,25 +144,31 @@ class LoanCalculator {
         const quarterDiv = document.createElement('div');
         quarterDiv.className = 'quarter-input-group';
         
-        // Calculate fiscal quarter details
-        const fiscalQuarter = this.getFiscalQuarterInfo(this.quarterCounter);
+        // Generate dropdown options for fiscal quarters
+        const fiscalQuarterOptions = this.generateFiscalQuarterOptions();
         
-        // Determine if this is the current quarter
+        // Determine if this is the first quarter (for default selection)
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1;
-        let isCurrentQuarter = false;
+        let isFirstQuarter = false;
+        let defaultSelection = '';
         
         if (this.quarterCounter === 1) {
             // First quarter input should represent the current fiscal quarter
-            isCurrentQuarter = true;
+            isFirstQuarter = true;
+            // Set default selection to current quarter
+            const currentQuarterInfo = this.getFiscalQuarterInfo(1);
+            defaultSelection = `${currentQuarterInfo.actualQuarter}-${currentQuarterInfo.yearOffset}`;
         }
-        
-        const currentIndicator = isCurrentQuarter ? '<span class="current-quarter-badge">Current</span>' : '';
         
         quarterDiv.innerHTML = `
             <div>
-                <label>${fiscalQuarter.label} ${currentIndicator}</label>
-                <small class="quarter-period">${fiscalQuarter.period}</small>
+                <label>Select Fiscal Quarter</label>
+                <select class="quarter-selector" data-quarter="${this.quarterCounter}" onchange="loanCalculator.updateQuarterInfo(this)">
+                    <option value="">Select Quarter...</option>
+                    ${fiscalQuarterOptions}
+                </select>
+                <small class="quarter-period" style="display: none;"></small>
             </div>
             <div>
                 <input type="number" class="quarter-rate" placeholder="Enter rate % (leave blank if unchanged)" 
@@ -173,6 +179,51 @@ class LoanCalculator {
             </div>
         `;
         this.quarterlyRatesContainer.appendChild(quarterDiv);
+        
+        // Set default selection for the first quarter
+        if (isFirstQuarter && defaultSelection) {
+            const selectElement = quarterDiv.querySelector('.quarter-selector');
+            selectElement.value = defaultSelection;
+            this.updateQuarterInfo(selectElement);
+        }
+    }
+
+    generateFiscalQuarterOptions() {
+        const options = [];
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        
+        // Generate options for current year and next 5 years
+        for (let yearOffset = 0; yearOffset <= 5; yearOffset++) {
+            const fiscalYear = currentYear + yearOffset;
+            const fyLabel = yearOffset === 0 ? 'FY' : `FY Year ${yearOffset + 1}`;
+            
+            const quarters = [
+                { value: `1-${yearOffset}`, label: `Q1 (${fyLabel}) - Apr-Jun ${fiscalYear}`, period: 'Apr - Jun' },
+                { value: `2-${yearOffset}`, label: `Q2 (${fyLabel}) - Jul-Sep ${fiscalYear}`, period: 'Jul - Sep' },
+                { value: `3-${yearOffset}`, label: `Q3 (${fyLabel}) - Oct-Dec ${fiscalYear}`, period: 'Oct - Dec' },
+                { value: `4-${yearOffset}`, label: `Q4 (${fyLabel}) - Jan-Mar ${fiscalYear + 1}`, period: 'Jan - Mar' }
+            ];
+            
+            quarters.forEach(quarter => {
+                options.push(`<option value="${quarter.value}" data-period="${quarter.period}">${quarter.label}</option>`);
+            });
+        }
+        
+        return options.join('');
+    }
+
+    updateQuarterInfo(selectElement) {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const periodSpan = selectElement.closest('.quarter-input-group').querySelector('.quarter-period');
+        
+        if (selectedOption.value) {
+            const period = selectedOption.getAttribute('data-period');
+            periodSpan.textContent = period;
+            periodSpan.style.display = 'block';
+        } else {
+            periodSpan.style.display = 'none';
+        }
     }
 
     getFiscalQuarterInfo(quarterNumber) {
@@ -228,29 +279,6 @@ class LoanCalculator {
     removeQuarterInput(button) {
         const quarterDiv = button.closest('.quarter-input-group');
         quarterDiv.remove();
-        this.renumberQuarters();
-    }
-
-    renumberQuarters() {
-        const quarterInputs = this.quarterlyRatesContainer.querySelectorAll('.quarter-input-group');
-        quarterInputs.forEach((quarterDiv, index) => {
-            const quarterNumber = index + 1;
-            const fiscalQuarter = this.getFiscalQuarterInfo(quarterNumber);
-            
-            const label = quarterDiv.querySelector('label');
-            const periodSpan = quarterDiv.querySelector('.quarter-period');
-            const input = quarterDiv.querySelector('.quarter-rate');
-            
-            // Add current indicator for the first quarter
-            const currentIndicator = quarterNumber === 1 ? '<span class="current-quarter-badge">Current</span>' : '';
-            label.innerHTML = `${fiscalQuarter.label} ${currentIndicator}`;
-            
-            if (periodSpan) {
-                periodSpan.textContent = fiscalQuarter.period;
-            }
-            input.setAttribute('data-quarter', quarterNumber);
-        });
-        this.quarterCounter = quarterInputs.length;
     }
 
     updateQuarterInputs() {
@@ -400,19 +428,53 @@ class LoanCalculator {
     }
 
     getQuarterlyRates(initialRate, tenureYears) {
-        const quarterInputs = this.quarterlyRatesContainer.querySelectorAll('.quarter-rate');
+        const quarterInputGroups = this.quarterlyRatesContainer.querySelectorAll('.quarter-input-group');
         const totalQuarters = Math.ceil(tenureYears * 4);
         const quarterlyRates = [];
-
+        
+        // Create a map of selected quarters to their rates
+        const quarterRateMap = new Map();
+        
+        quarterInputGroups.forEach(group => {
+            const selector = group.querySelector('.quarter-selector');
+            const rateInput = group.querySelector('.quarter-rate');
+            
+            if (selector.value && rateInput.value && !isNaN(parseFloat(rateInput.value))) {
+                // Parse the selected quarter (format: "quarter-yearOffset")
+                const [quarter, yearOffset] = selector.value.split('-').map(Number);
+                const quarterKey = `${quarter}-${yearOffset}`;
+                quarterRateMap.set(quarterKey, parseFloat(rateInput.value));
+            }
+        });
+        
+        // Get current fiscal quarter info to determine the starting point
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        let currentFiscalQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1;
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2;
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3;
+        } else {
+            currentFiscalQuarter = 4;
+        }
+        
         let currentRate = initialRate;
         
-        for (let quarter = 0; quarter < totalQuarters; quarter++) {
-            if (quarter < quarterInputs.length) {
-                const inputValue = quarterInputs[quarter].value;
-                if (inputValue && !isNaN(parseFloat(inputValue))) {
-                    currentRate = parseFloat(inputValue);
-                }
+        // Fill quarterly rates array
+        for (let monthIndex = 0; monthIndex < totalQuarters * 3; monthIndex += 3) {
+            const quarterOffset = Math.floor(monthIndex / 3);
+            const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
+            const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4 + 1;
+            const quarterKey = `${quarterIndex}-${yearOffset}`;
+            
+            // Check if we have a rate specified for this quarter
+            if (quarterRateMap.has(quarterKey)) {
+                currentRate = quarterRateMap.get(quarterKey);
             }
+            
             quarterlyRates.push(currentRate);
         }
 

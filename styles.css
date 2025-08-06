@@ -200,6 +200,28 @@ header p {
     box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
+.quarter-selector {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+
+.quarter-selector:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.quarter-selector option {
+    padding: 8px;
+    font-size: 14px;
+}
+
 .remove-quarter-btn {
     padding: 8px 12px;
     background: #fed7d7;
