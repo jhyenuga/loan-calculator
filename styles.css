@@ -98,6 +98,31 @@ header p {
     font-style: italic;
 }
 
+#quarterlyRatesContainer {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    padding-right: 5px;
+}
+
+#quarterlyRatesContainer::-webkit-scrollbar {
+    width: 8px;
+}
+
+#quarterlyRatesContainer::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#quarterlyRatesContainer::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+#quarterlyRatesContainer::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
 .quarter-input-group {
     display: grid;
     grid-template-columns: 1fr 2fr auto;
@@ -429,6 +454,10 @@ footer {
     #emiTable td {
         padding: 8px 5px;
     }
+    
+    #quarterlyRatesContainer {
+        max-height: 200px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -438,6 +467,10 @@ footer {
     
     .summary-card p {
         font-size: 1.2em;
+    }
+    
+    #quarterlyRatesContainer {
+        max-height: 150px;
     }
 }
 
