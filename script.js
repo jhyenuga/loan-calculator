@@ -456,9 +456,11 @@ class LoanCalculator {
 
             // Get fiscal quarter info for display
             const fiscalQuarterInfo = this.getFiscalQuarterDisplayInfo(month);
+            const fiscalMonthInfo = this.getFiscalMonthInfo(month);
 
             schedule.push({
                 month: month,
+                fiscalMonth: fiscalMonthInfo,
                 fiscalQuarter: fiscalQuarterInfo.quarter,
                 fiscalPeriod: fiscalQuarterInfo.period,
                 interestRate: currentQuarterRate,
@@ -557,6 +559,48 @@ class LoanCalculator {
         };
     }
 
+    getFiscalMonthInfo(calendarMonth) {
+        // Get current date info
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        
+        // Determine current fiscal quarter and month within that quarter
+        let currentFiscalQuarter, currentFiscalMonthInQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1;
+            currentFiscalMonthInQuarter = currentMonth - 3; // Apr=1, May=2, Jun=3
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2;
+            currentFiscalMonthInQuarter = currentMonth - 6; // Jul=1, Aug=2, Sep=3
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3;
+            currentFiscalMonthInQuarter = currentMonth - 9; // Oct=1, Nov=2, Dec=3
+        } else {
+            currentFiscalQuarter = 4;
+            currentFiscalMonthInQuarter = currentMonth + 3; // Jan=1, Feb=2, Mar=3
+        }
+        
+        // Calculate which quarter and month this calendar month represents
+        const monthsFromStart = calendarMonth - 1;
+        const quarterOffset = Math.floor(monthsFromStart / 3);
+        const monthInQuarter = (monthsFromStart % 3) + 1;
+        const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
+        const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4;
+        
+        const fiscalQuarters = [
+            { quarter: 'Q1', monthNames: ['Apr', 'May', 'Jun'] },
+            { quarter: 'Q2', monthNames: ['Jul', 'Aug', 'Sep'] },
+            { quarter: 'Q3', monthNames: ['Oct', 'Nov', 'Dec'] },
+            { quarter: 'Q4', monthNames: ['Jan', 'Feb', 'Mar'] }
+        ];
+        
+        const quarterInfo = fiscalQuarters[quarterIndex];
+        const monthName = quarterInfo.monthNames[monthInQuarter - 1];
+        const displayYear = yearOffset + 1;
+        
+        return `${monthName} (${quarterInfo.quarter} FY${displayYear})`;
+    }
+
     performFixedLoanCalculations(principal, annualRate, tenureYears) {
         // Convert to monthly and daily rates
         const monthlyRate = (annualRate / 100) / 12;
@@ -598,8 +642,12 @@ class LoanCalculator {
             const principalPayment = emi - adjustedMonthlyInterest;
             const closingBalance = Math.max(0, openingBalance - principalPayment);
 
+            // Get fiscal month info for display
+            const fiscalMonthInfo = this.getFiscalMonthInfo(month);
+
             schedule.push({
                 month: month,
+                fiscalMonth: fiscalMonthInfo,
                 openingBalance: openingBalance,
                 emi: emi,
                 interest: adjustedMonthlyInterest,
@@ -639,18 +687,19 @@ class LoanCalculator {
     generateEMITable(schedule, isFloating = false) {
         this.emiTableBody.innerHTML = '';
 
-        // Update table header if needed
+        // Update table header if needed for floating rate specific columns
         const tableHeader = document.querySelector('#emiTable thead tr');
         if (isFloating && !tableHeader.querySelector('.fiscal-quarter-column')) {
+            // For floating rate, insert fiscal quarter right after fiscal month (position 2)
             const fiscalQuarterHeader = document.createElement('th');
             fiscalQuarterHeader.textContent = 'Fiscal Quarter';
             fiscalQuarterHeader.className = 'fiscal-quarter-column';
-            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]); // Insert after Opening Balance
+            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]); // Insert after Fiscal Month
             
             const rateHeader = document.createElement('th');
             rateHeader.textContent = 'Rate (%)';
             rateHeader.className = 'rate-column';
-            tableHeader.insertBefore(rateHeader, tableHeader.children[4]); // Insert before Interest column
+            tableHeader.insertBefore(rateHeader, tableHeader.children[4]); // Insert after Opening Balance, before EMI
         } else if (!isFloating) {
             const fiscalQuarterCol = tableHeader.querySelector('.fiscal-quarter-column');
             const rateCol = tableHeader.querySelector('.rate-column');
@@ -664,10 +713,11 @@ class LoanCalculator {
             if (isFloating) {
                 row.innerHTML = `
                     <td>${payment.month}</td>
-                    <td>${this.formatCurrency(payment.openingBalance)}</td>
+                    <td class="fiscal-month-cell">${payment.fiscalMonth}</td>
                     <td><span class="fiscal-quarter-info">${payment.fiscalQuarter}</span></td>
-                    <td>${this.formatCurrency(payment.emi)}</td>
+                    <td>${this.formatCurrency(payment.openingBalance)}</td>
                     <td>${payment.interestRate.toFixed(2)}%</td>
+                    <td>${this.formatCurrency(payment.emi)}</td>
                     <td>${this.formatCurrency(payment.interest)}</td>
                     <td>${this.formatCurrency(payment.principal)}</td>
                     <td>${this.formatCurrency(payment.closingBalance)}</td>
@@ -675,6 +725,7 @@ class LoanCalculator {
             } else {
                 row.innerHTML = `
                     <td>${payment.month}</td>
+                    <td class="fiscal-month-cell">${payment.fiscalMonth}</td>
                     <td>${this.formatCurrency(payment.openingBalance)}</td>
                     <td>${this.formatCurrency(payment.emi)}</td>
                     <td>${this.formatCurrency(payment.interest)}</td>
