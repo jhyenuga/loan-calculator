@@ -426,9 +426,6 @@ class LoanCalculator {
         let totalInterestPaid = 0;
         let totalAmountPaid = 0;
 
-        // Get current date for month/year calculation
-        const currentDate = new Date();
-
         for (let month = 1; month <= totalMonths; month++) {
             // Map calendar month to fiscal quarter
             const fiscalQuarterIndex = this.getfiscalQuarterIndex(month);
@@ -459,15 +456,9 @@ class LoanCalculator {
 
             // Get fiscal quarter info for display
             const fiscalQuarterInfo = this.getFiscalQuarterDisplayInfo(month);
-            
-            // Calculate actual month and year
-            const actualDate = new Date(currentDate);
-            actualDate.setMonth(actualDate.getMonth() + month - 1);
-            const actualMonthYear = this.formatMonthYear(actualDate);
 
             schedule.push({
                 month: month,
-                actualMonthYear: actualMonthYear,
                 fiscalQuarter: fiscalQuarterInfo.quarter,
                 fiscalPeriod: fiscalQuarterInfo.period,
                 interestRate: currentQuarterRate,
@@ -594,9 +585,6 @@ class LoanCalculator {
     generateFixedAmortizationSchedule(principal, dailyRate, emi, totalMonths) {
         const schedule = [];
         let remainingBalance = principal;
-        
-        // Get current date for month/year calculation
-        const currentDate = new Date();
 
         for (let month = 1; month <= totalMonths; month++) {
             const openingBalance = remainingBalance;
@@ -610,14 +598,8 @@ class LoanCalculator {
             const principalPayment = emi - adjustedMonthlyInterest;
             const closingBalance = Math.max(0, openingBalance - principalPayment);
 
-            // Calculate actual month and year
-            const actualDate = new Date(currentDate);
-            actualDate.setMonth(actualDate.getMonth() + month - 1);
-            const actualMonthYear = this.formatMonthYear(actualDate);
-
             schedule.push({
                 month: month,
-                actualMonthYear: actualMonthYear,
                 openingBalance: openingBalance,
                 emi: emi,
                 interest: adjustedMonthlyInterest,
@@ -659,25 +641,16 @@ class LoanCalculator {
 
         // Update table header if needed
         const tableHeader = document.querySelector('#emiTable thead tr');
-        
-        // Add Month/Year column if not present
-        if (!tableHeader.querySelector('.month-year-column')) {
-            const monthYearHeader = document.createElement('th');
-            monthYearHeader.textContent = 'Month/Year';
-            monthYearHeader.className = 'month-year-column';
-            tableHeader.insertBefore(monthYearHeader, tableHeader.children[1]); // Insert after Month column
-        }
-        
         if (isFloating && !tableHeader.querySelector('.fiscal-quarter-column')) {
             const fiscalQuarterHeader = document.createElement('th');
             fiscalQuarterHeader.textContent = 'Fiscal Quarter';
             fiscalQuarterHeader.className = 'fiscal-quarter-column';
-            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[3]); // Insert after Opening Balance
+            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]); // Insert after Opening Balance
             
             const rateHeader = document.createElement('th');
             rateHeader.textContent = 'Rate (%)';
             rateHeader.className = 'rate-column';
-            tableHeader.insertBefore(rateHeader, tableHeader.children[5]); // Insert before Interest column
+            tableHeader.insertBefore(rateHeader, tableHeader.children[4]); // Insert before Interest column
         } else if (!isFloating) {
             const fiscalQuarterCol = tableHeader.querySelector('.fiscal-quarter-column');
             const rateCol = tableHeader.querySelector('.rate-column');
@@ -691,7 +664,6 @@ class LoanCalculator {
             if (isFloating) {
                 row.innerHTML = `
                     <td>${payment.month}</td>
-                    <td class="month-year-cell">${payment.actualMonthYear}</td>
                     <td>${this.formatCurrency(payment.openingBalance)}</td>
                     <td><span class="fiscal-quarter-info">${payment.fiscalQuarter}</span></td>
                     <td>${this.formatCurrency(payment.emi)}</td>
@@ -703,7 +675,6 @@ class LoanCalculator {
             } else {
                 row.innerHTML = `
                     <td>${payment.month}</td>
-                    <td class="month-year-cell">${payment.actualMonthYear}</td>
                     <td>${this.formatCurrency(payment.openingBalance)}</td>
                     <td>${this.formatCurrency(payment.emi)}</td>
                     <td>${this.formatCurrency(payment.interest)}</td>
@@ -723,14 +694,6 @@ class LoanCalculator {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(Math.round(amount));
-    }
-
-    formatMonthYear(date) {
-        const options = { 
-            year: 'numeric', 
-            month: 'short'
-        };
-        return date.toLocaleDateString('en-US', options);
     }
 
     clearFixedForm() {
