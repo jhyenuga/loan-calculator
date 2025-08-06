@@ -101,6 +101,42 @@ class LoanCalculator {
         this.addQuarterInput();
         this.addQuarterInput();
         this.addQuarterInput();
+        
+        // Add current date information
+        this.displayCurrentDateInfo();
+    }
+
+    displayCurrentDateInfo() {
+        const currentDate = new Date();
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        const formattedDate = currentDate.toLocaleDateString('en-US', options);
+        
+        const currentMonth = currentDate.getMonth() + 1;
+        let currentFiscalQuarter = '';
+        let currentPeriod = '';
+        
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 'Q1';
+            currentPeriod = 'April - June';
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 'Q2';
+            currentPeriod = 'July - September';
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 'Q3';
+            currentPeriod = 'October - December';
+        } else {
+            currentFiscalQuarter = 'Q4';
+            currentPeriod = 'January - March';
+        }
+        
+        // Update the info text to include current date context
+        const infoTextElement = document.querySelector('.floating-rates-section .info-text');
+        if (infoTextElement) {
+            infoTextElement.innerHTML = `
+                <strong>Today is ${formattedDate}</strong> - Currently in fiscal ${currentFiscalQuarter} (${currentPeriod})<br>
+                Enter interest rates for each fiscal quarter starting from the current period. The first quarter represents the current fiscal quarter. Leave blank if rate remains unchanged for that quarter.
+            `;
+        }
     }
 
     addQuarterInput() {
@@ -111,9 +147,21 @@ class LoanCalculator {
         // Calculate fiscal quarter details
         const fiscalQuarter = this.getFiscalQuarterInfo(this.quarterCounter);
         
+        // Determine if this is the current quarter
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        let isCurrentQuarter = false;
+        
+        if (this.quarterCounter === 1) {
+            // First quarter input should represent the current fiscal quarter
+            isCurrentQuarter = true;
+        }
+        
+        const currentIndicator = isCurrentQuarter ? '<span class="current-quarter-badge">Current</span>' : '';
+        
         quarterDiv.innerHTML = `
             <div>
-                <label>${fiscalQuarter.label}</label>
+                <label>${fiscalQuarter.label} ${currentIndicator}</label>
                 <small class="quarter-period">${fiscalQuarter.period}</small>
             </div>
             <div>
@@ -128,6 +176,27 @@ class LoanCalculator {
     }
 
     getFiscalQuarterInfo(quarterNumber) {
+        // Get current date to determine starting quarter
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-based
+        const currentYear = currentDate.getFullYear();
+        
+        // Determine which fiscal quarter we're currently in
+        let currentFiscalQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1; // Q1: Apr-Jun
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2; // Q2: Jul-Sep
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3; // Q3: Oct-Dec
+        } else {
+            currentFiscalQuarter = 4; // Q4: Jan-Mar
+        }
+        
+        // Calculate which quarter this input represents
+        const quarterIndex = (currentFiscalQuarter - 1 + quarterNumber - 1) % 4;
+        const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterNumber - 1) / 4);
+        
         const fiscalQuarters = [
             { label: 'Q1 (FY)', period: 'Apr - Jun', months: [4, 5, 6] },
             { label: 'Q2 (FY)', period: 'Jul - Sep', months: [7, 8, 9] },
@@ -135,18 +204,24 @@ class LoanCalculator {
             { label: 'Q4 (FY)', period: 'Jan - Mar', months: [1, 2, 3] }
         ];
         
-        const year = Math.floor((quarterNumber - 1) / 4) + 1;
-        const quarterIndex = (quarterNumber - 1) % 4;
         const quarterInfo = fiscalQuarters[quarterIndex];
         
-        if (year > 1) {
+        if (yearOffset > 0) {
             return {
-                label: `${quarterInfo.label} Year ${year}`,
+                label: `${quarterInfo.label} Year ${yearOffset + 1}`,
                 period: quarterInfo.period,
-                months: quarterInfo.months
+                months: quarterInfo.months,
+                actualQuarter: quarterIndex + 1,
+                yearOffset: yearOffset
             };
         } else {
-            return quarterInfo;
+            return {
+                label: quarterInfo.label,
+                period: quarterInfo.period,
+                months: quarterInfo.months,
+                actualQuarter: quarterIndex + 1,
+                yearOffset: yearOffset
+            };
         }
     }
 
@@ -166,7 +241,10 @@ class LoanCalculator {
             const periodSpan = quarterDiv.querySelector('.quarter-period');
             const input = quarterDiv.querySelector('.quarter-rate');
             
-            label.textContent = fiscalQuarter.label;
+            // Add current indicator for the first quarter
+            const currentIndicator = quarterNumber === 1 ? '<span class="current-quarter-badge">Current</span>' : '';
+            label.innerHTML = `${fiscalQuarter.label} ${currentIndicator}`;
+            
             if (periodSpan) {
                 periodSpan.textContent = fiscalQuarter.period;
             }
@@ -413,41 +491,70 @@ class LoanCalculator {
     }
 
     getfiscalQuarterIndex(calendarMonth) {
-        // Fiscal year quarters: Q1 (Apr-Jun), Q2 (Jul-Sep), Q3 (Oct-Dec), Q4 (Jan-Mar)
-        // Map calendar months to fiscal quarters
-        const year = Math.floor((calendarMonth - 1) / 12);
-        const monthInYear = ((calendarMonth - 1) % 12) + 1;
+        // Get current date to determine starting point
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-based
         
-        let fiscalQuarterInYear;
-        if (monthInYear >= 4 && monthInYear <= 6) {
-            fiscalQuarterInYear = 0; // Q1: Apr-Jun
-        } else if (monthInYear >= 7 && monthInYear <= 9) {
-            fiscalQuarterInYear = 1; // Q2: Jul-Sep
-        } else if (monthInYear >= 10 && monthInYear <= 12) {
-            fiscalQuarterInYear = 2; // Q3: Oct-Dec
+        // Determine which fiscal quarter we're currently in
+        let currentFiscalQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1; // Q1: Apr-Jun
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2; // Q2: Jul-Sep
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3; // Q3: Oct-Dec
         } else {
-            fiscalQuarterInYear = 3; // Q4: Jan-Mar
+            currentFiscalQuarter = 4; // Q4: Jan-Mar
         }
         
-        return year * 4 + fiscalQuarterInYear;
+        // Calculate how many months into the loan we are
+        const loanYear = Math.floor((calendarMonth - 1) / 12);
+        const monthInLoanYear = ((calendarMonth - 1) % 12) + 1;
+        
+        // Calculate which quarter this month falls into, starting from current fiscal quarter
+        const monthsFromStart = calendarMonth - 1;
+        const quarterFromStart = Math.floor(monthsFromStart / 3);
+        
+        return quarterFromStart;
     }
 
     getFiscalQuarterDisplayInfo(calendarMonth) {
-        const year = Math.floor((calendarMonth - 1) / 12) + 1;
-        const monthInYear = ((calendarMonth - 1) % 12) + 1;
+        // Get current date info
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
         
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        
-        if (monthInYear >= 4 && monthInYear <= 6) {
-            return { quarter: `Q1 FY${year}`, period: 'Apr-Jun' };
-        } else if (monthInYear >= 7 && monthInYear <= 9) {
-            return { quarter: `Q2 FY${year}`, period: 'Jul-Sep' };
-        } else if (monthInYear >= 10 && monthInYear <= 12) {
-            return { quarter: `Q3 FY${year}`, period: 'Oct-Dec' };
+        // Determine current fiscal quarter
+        let currentFiscalQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1;
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2;
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3;
         } else {
-            return { quarter: `Q4 FY${year}`, period: 'Jan-Mar' };
+            currentFiscalQuarter = 4;
         }
+        
+        // Calculate which quarter this calendar month represents
+        const monthsFromStart = calendarMonth - 1;
+        const quarterOffset = Math.floor(monthsFromStart / 3);
+        const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
+        const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4;
+        
+        const fiscalQuarters = [
+            { quarter: 'Q1', period: 'Apr-Jun' },
+            { quarter: 'Q2', period: 'Jul-Sep' },
+            { quarter: 'Q3', period: 'Oct-Dec' },
+            { quarter: 'Q4', period: 'Jan-Mar' }
+        ];
+        
+        const quarterInfo = fiscalQuarters[quarterIndex];
+        const displayYear = yearOffset + 1;
+        
+        return { 
+            quarter: `${quarterInfo.quarter} FY${displayYear}`, 
+            period: quarterInfo.period 
+        };
     }
 
     performFixedLoanCalculations(principal, annualRate, tenureYears) {
