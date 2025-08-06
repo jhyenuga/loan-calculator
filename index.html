@@ -13,9 +13,18 @@
             <p>Calculate your loan EMI with detailed monthly breakdown</p>
         </header>
 
+        <!-- Calculator Type Selector -->
+        <div class="calculator-type-selector">
+            <div class="type-tabs">
+                <button id="fixedRateTab" class="tab-btn active">Fixed Rate Calculator</button>
+                <button id="floatingRateTab" class="tab-btn">Floating Rate Calculator</button>
+            </div>
+        </div>
+
         <div class="calculator-section">
-            <div class="input-section">
-                <h2>Loan Details</h2>
+            <!-- Fixed Rate Calculator -->
+            <div class="input-section" id="fixedRateSection">
+                <h2>Fixed Rate Loan Details</h2>
                 <div class="input-group">
                     <label for="principal">Principal Amount (₹)</label>
                     <input type="number" id="principal" placeholder="Enter loan amount" min="1" step="1000">
@@ -33,6 +42,37 @@
                 
                 <button id="calculateBtn" class="calculate-btn">Calculate EMI</button>
                 <button id="clearBtn" class="clear-btn">Clear</button>
+            </div>
+
+            <!-- Floating Rate Calculator -->
+            <div class="input-section" id="floatingRateSection" style="display: none;">
+                <h2>Floating Rate Loan Details</h2>
+                <div class="input-group">
+                    <label for="floatingPrincipal">Principal Amount (₹)</label>
+                    <input type="number" id="floatingPrincipal" placeholder="Enter loan amount" min="1" step="1000">
+                </div>
+                
+                <div class="input-group">
+                    <label for="initialInterestRate">Initial Annual Interest Rate (%)</label>
+                    <input type="number" id="initialInterestRate" placeholder="Enter initial interest rate" min="0.1" step="0.1" max="50">
+                </div>
+                
+                <div class="input-group">
+                    <label for="floatingTenure">Loan Tenure (Years)</label>
+                    <input type="number" id="floatingTenure" placeholder="Enter tenure in years" min="1" step="1" max="30">
+                </div>
+
+                <div class="floating-rates-section">
+                    <h3>Quarterly Interest Rate Changes</h3>
+                    <p class="info-text">Leave blank if rate remains unchanged for that quarter</p>
+                    <div id="quarterlyRatesContainer">
+                        <!-- Quarterly rates will be dynamically added here -->
+                    </div>
+                    <button id="addQuarterBtn" class="add-quarter-btn">Add Quarter</button>
+                </div>
+                
+                <button id="calculateFloatingBtn" class="calculate-btn">Calculate Floating EMI</button>
+                <button id="clearFloatingBtn" class="clear-btn">Clear</button>
             </div>
 
             <div class="results-section" id="resultsSection">
