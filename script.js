@@ -134,7 +134,7 @@ class LoanCalculator {
         if (infoTextElement) {
             infoTextElement.innerHTML = `
                 <strong>Today is ${formattedDate}</strong> - Currently in fiscal ${currentFiscalQuarter} (${currentPeriod})<br>
-                Enter interest rates for each fiscal quarter starting from the current period. The first quarter represents the current fiscal quarter. Leave blank if rate remains unchanged for that quarter.
+                Enter revised interest rates for the specified fiscal quarter.
             `;
         }
     }
