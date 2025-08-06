@@ -107,9 +107,14 @@ class LoanCalculator {
         this.quarterCounter++;
         const quarterDiv = document.createElement('div');
         quarterDiv.className = 'quarter-input-group';
+        
+        // Calculate fiscal quarter details
+        const fiscalQuarter = this.getFiscalQuarterInfo(this.quarterCounter);
+        
         quarterDiv.innerHTML = `
             <div>
-                <label>Quarter ${this.quarterCounter}</label>
+                <label>${fiscalQuarter.label}</label>
+                <small class="quarter-period">${fiscalQuarter.period}</small>
             </div>
             <div>
                 <input type="number" class="quarter-rate" placeholder="Enter rate % (leave blank if unchanged)" 
@@ -122,6 +127,29 @@ class LoanCalculator {
         this.quarterlyRatesContainer.appendChild(quarterDiv);
     }
 
+    getFiscalQuarterInfo(quarterNumber) {
+        const fiscalQuarters = [
+            { label: 'Q1 (FY)', period: 'Apr - Jun', months: [4, 5, 6] },
+            { label: 'Q2 (FY)', period: 'Jul - Sep', months: [7, 8, 9] },
+            { label: 'Q3 (FY)', period: 'Oct - Dec', months: [10, 11, 12] },
+            { label: 'Q4 (FY)', period: 'Jan - Mar', months: [1, 2, 3] }
+        ];
+        
+        const year = Math.floor((quarterNumber - 1) / 4) + 1;
+        const quarterIndex = (quarterNumber - 1) % 4;
+        const quarterInfo = fiscalQuarters[quarterIndex];
+        
+        if (year > 1) {
+            return {
+                label: `${quarterInfo.label} Year ${year}`,
+                period: quarterInfo.period,
+                months: quarterInfo.months
+            };
+        } else {
+            return quarterInfo;
+        }
+    }
+
     removeQuarterInput(button) {
         const quarterDiv = button.closest('.quarter-input-group');
         quarterDiv.remove();
@@ -131,10 +159,18 @@ class LoanCalculator {
     renumberQuarters() {
         const quarterInputs = this.quarterlyRatesContainer.querySelectorAll('.quarter-input-group');
         quarterInputs.forEach((quarterDiv, index) => {
+            const quarterNumber = index + 1;
+            const fiscalQuarter = this.getFiscalQuarterInfo(quarterNumber);
+            
             const label = quarterDiv.querySelector('label');
+            const periodSpan = quarterDiv.querySelector('.quarter-period');
             const input = quarterDiv.querySelector('.quarter-rate');
-            label.textContent = `Quarter ${index + 1}`;
-            input.setAttribute('data-quarter', index + 1);
+            
+            label.textContent = fiscalQuarter.label;
+            if (periodSpan) {
+                periodSpan.textContent = fiscalQuarter.period;
+            }
+            input.setAttribute('data-quarter', quarterNumber);
         });
         this.quarterCounter = quarterInputs.length;
     }
@@ -313,8 +349,9 @@ class LoanCalculator {
         let totalAmountPaid = 0;
 
         for (let month = 1; month <= totalMonths; month++) {
-            const quarterIndex = Math.floor((month - 1) / 3);
-            const currentQuarterRate = quarterlyRates[Math.min(quarterIndex, quarterlyRates.length - 1)];
+            // Map calendar month to fiscal quarter
+            const fiscalQuarterIndex = this.getfiscalQuarterIndex(month);
+            const currentQuarterRate = quarterlyRates[Math.min(fiscalQuarterIndex, quarterlyRates.length - 1)];
             const monthlyRate = (currentQuarterRate / 100) / 12;
             const dailyRate = (currentQuarterRate / 100) / 365;
             
@@ -339,9 +376,13 @@ class LoanCalculator {
             const principalPayment = emi - adjustedMonthlyInterest;
             const closingBalance = Math.max(0, openingBalance - principalPayment);
 
+            // Get fiscal quarter info for display
+            const fiscalQuarterInfo = this.getFiscalQuarterDisplayInfo(month);
+
             schedule.push({
                 month: month,
-                quarter: Math.floor((month - 1) / 3) + 1,
+                fiscalQuarter: fiscalQuarterInfo.quarter,
+                fiscalPeriod: fiscalQuarterInfo.period,
                 interestRate: currentQuarterRate,
                 openingBalance: openingBalance,
                 emi: emi,
@@ -369,6 +410,44 @@ class LoanCalculator {
             schedule: schedule,
             isFloating: true
         };
+    }
+
+    getfiscalQuarterIndex(calendarMonth) {
+        // Fiscal year quarters: Q1 (Apr-Jun), Q2 (Jul-Sep), Q3 (Oct-Dec), Q4 (Jan-Mar)
+        // Map calendar months to fiscal quarters
+        const year = Math.floor((calendarMonth - 1) / 12);
+        const monthInYear = ((calendarMonth - 1) % 12) + 1;
+        
+        let fiscalQuarterInYear;
+        if (monthInYear >= 4 && monthInYear <= 6) {
+            fiscalQuarterInYear = 0; // Q1: Apr-Jun
+        } else if (monthInYear >= 7 && monthInYear <= 9) {
+            fiscalQuarterInYear = 1; // Q2: Jul-Sep
+        } else if (monthInYear >= 10 && monthInYear <= 12) {
+            fiscalQuarterInYear = 2; // Q3: Oct-Dec
+        } else {
+            fiscalQuarterInYear = 3; // Q4: Jan-Mar
+        }
+        
+        return year * 4 + fiscalQuarterInYear;
+    }
+
+    getFiscalQuarterDisplayInfo(calendarMonth) {
+        const year = Math.floor((calendarMonth - 1) / 12) + 1;
+        const monthInYear = ((calendarMonth - 1) % 12) + 1;
+        
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        if (monthInYear >= 4 && monthInYear <= 6) {
+            return { quarter: `Q1 FY${year}`, period: 'Apr-Jun' };
+        } else if (monthInYear >= 7 && monthInYear <= 9) {
+            return { quarter: `Q2 FY${year}`, period: 'Jul-Sep' };
+        } else if (monthInYear >= 10 && monthInYear <= 12) {
+            return { quarter: `Q3 FY${year}`, period: 'Oct-Dec' };
+        } else {
+            return { quarter: `Q4 FY${year}`, period: 'Jan-Mar' };
+        }
     }
 
     performFixedLoanCalculations(principal, annualRate, tenureYears) {
@@ -455,13 +534,21 @@ class LoanCalculator {
 
         // Update table header if needed
         const tableHeader = document.querySelector('#emiTable thead tr');
-        if (isFloating && !tableHeader.querySelector('.rate-column')) {
+        if (isFloating && !tableHeader.querySelector('.fiscal-quarter-column')) {
+            const fiscalQuarterHeader = document.createElement('th');
+            fiscalQuarterHeader.textContent = 'Fiscal Quarter';
+            fiscalQuarterHeader.className = 'fiscal-quarter-column';
+            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]); // Insert after Opening Balance
+            
             const rateHeader = document.createElement('th');
             rateHeader.textContent = 'Rate (%)';
             rateHeader.className = 'rate-column';
-            tableHeader.insertBefore(rateHeader, tableHeader.children[3]); // Insert before Interest column
-        } else if (!isFloating && tableHeader.querySelector('.rate-column')) {
-            tableHeader.querySelector('.rate-column').remove();
+            tableHeader.insertBefore(rateHeader, tableHeader.children[4]); // Insert before Interest column
+        } else if (!isFloating) {
+            const fiscalQuarterCol = tableHeader.querySelector('.fiscal-quarter-column');
+            const rateCol = tableHeader.querySelector('.rate-column');
+            if (fiscalQuarterCol) fiscalQuarterCol.remove();
+            if (rateCol) rateCol.remove();
         }
 
         schedule.forEach(payment => {
@@ -471,6 +558,7 @@ class LoanCalculator {
                 row.innerHTML = `
                     <td>${payment.month}</td>
                     <td>${this.formatCurrency(payment.openingBalance)}</td>
+                    <td><span class="fiscal-quarter-info">${payment.fiscalQuarter}</span></td>
                     <td>${this.formatCurrency(payment.emi)}</td>
                     <td>${payment.interestRate.toFixed(2)}%</td>
                     <td>${this.formatCurrency(payment.interest)}</td>
@@ -577,9 +665,9 @@ function addFloatingExampleData() {
     calculator.initialInterestRateInput.value = '7.5';
     calculator.floatingTenureInput.value = '15';
     
-    // Add progressive rate increases
+    // Add progressive rate increases aligned with fiscal quarters
     const quarterInputs = calculator.quarterlyRatesContainer.querySelectorAll('.quarter-rate');
-    const rates = [7.5, 7.75, 8.0, 8.25, 8.5, 8.75, 9.0];
+    const rates = [7.5, 7.75, 8.0, 8.25, 8.5, 8.75, 9.0, 9.25]; // Rates for Q1 FY1, Q2 FY1, Q3 FY1, Q4 FY1, Q1 FY2, etc.
     quarterInputs.forEach((input, index) => {
         if (index < rates.length) {
             input.value = rates[index];
