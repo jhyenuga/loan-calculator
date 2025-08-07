@@ -255,39 +255,61 @@ class LoanCalculator {
     generateFiscalMonthOptions(maxTenure = 5) {
         const options = [];
         const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // 1-12
         const currentYear = currentDate.getFullYear();
         
         // Calculate maximum months based on tenure
         const maxMonths = maxTenure * 12;
         
-        // Generate fiscal months starting from April of current year
+        // Determine current fiscal quarter
+        let currentFiscalQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1;
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2;
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3;
+        } else {
+            currentFiscalQuarter = 4;
+        }
+        
+        // Generate months starting from current month
         let monthCounter = 1;
-        for (let yearOffset = 0; yearOffset <= Math.ceil(maxTenure) && monthCounter <= maxMonths; yearOffset++) {
-            const fiscalYear = currentYear + yearOffset;
-            const fyLabel = yearOffset === 0 ? 'FY' : `FY Year ${yearOffset + 1}`;
+        for (let monthOffset = 0; monthOffset < maxMonths && monthCounter <= maxMonths; monthOffset++) {
+            // Calculate actual calendar month and year
+            const totalMonthsFromStart = (currentMonth - 1) + monthOffset;
+            const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+            const actualMonth = (totalMonthsFromStart % 12) + 1;
             
-            const fiscalMonths = [
-                { month: 4, name: 'April', year: fiscalYear },
-                { month: 5, name: 'May', year: fiscalYear },
-                { month: 6, name: 'June', year: fiscalYear },
-                { month: 7, name: 'July', year: fiscalYear },
-                { month: 8, name: 'August', year: fiscalYear },
-                { month: 9, name: 'September', year: fiscalYear },
-                { month: 10, name: 'October', year: fiscalYear },
-                { month: 11, name: 'November', year: fiscalYear },
-                { month: 12, name: 'December', year: fiscalYear },
-                { month: 1, name: 'January', year: fiscalYear + 1 },
-                { month: 2, name: 'February', year: fiscalYear + 1 },
-                { month: 3, name: 'March', year: fiscalYear + 1 }
+            // Determine fiscal quarter and year for this month
+            let fiscalQuarter, fiscalYear, fyLabel;
+            if (actualMonth >= 4 && actualMonth <= 6) {
+                fiscalQuarter = 'Q1';
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 7 && actualMonth <= 9) {
+                fiscalQuarter = 'Q2';
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 10 && actualMonth <= 12) {
+                fiscalQuarter = 'Q3';
+                fiscalYear = actualYear;
+            } else { // Jan, Feb, Mar
+                fiscalQuarter = 'Q4';
+                fiscalYear = actualYear - 1;
+            }
+            
+            // Calculate fiscal year offset from current fiscal year
+            const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+            const fiscalYearOffset = fiscalYear - currentFiscalYear;
+            fyLabel = fiscalYearOffset === 0 ? 'FY' : `FY Year ${fiscalYearOffset + 1}`;
+            
+            const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
             ];
             
-            fiscalMonths.forEach(monthInfo => {
-                if (monthCounter <= maxMonths) {
-                    const label = `${monthInfo.name} ${monthInfo.year} (${fyLabel})`;
-                    options.push(`<option value="${monthCounter}">${label}</option>`);
-                    monthCounter++;
-                }
-            });
+            const label = `${monthNames[actualMonth - 1]} ${actualYear} (${fyLabel})`;
+            options.push(`<option value="${monthCounter}">${label}</option>`);
+            monthCounter++;
         }
         
         return options.join('');
@@ -501,7 +523,7 @@ class LoanCalculator {
         const quarterlyRates = this.getQuarterlyRates(initialRate, tenureYears);
 
         // Calculate floating loan details
-        const loanDetails = this.performFloatingLoanCalculations(principal, quarterlyRates, tenureYears);
+        const loanDetails = this.performFloatingLoanCalculations(principal, quarterlyRates, tenureYears, initialRate);
         
         // Display results
         this.displayResults(loanDetails);
@@ -509,8 +531,7 @@ class LoanCalculator {
 
     getQuarterlyRates(initialRate, tenureYears) {
         const quarterInputGroups = this.quarterlyRatesContainer.querySelectorAll('.quarter-input-group');
-        const totalQuarters = Math.ceil(tenureYears * 4);
-        const quarterlyRates = [];
+        const totalMonths = tenureYears * 12;
         
         // Create a map of selected quarters to their rates
         const quarterRateMap = new Map();
@@ -520,58 +541,140 @@ class LoanCalculator {
             const rateInput = group.querySelector('.quarter-rate');
             
             if (selector.value && rateInput.value && !isNaN(parseFloat(rateInput.value))) {
-                // Parse the selected quarter (format: "quarter-yearOffset")
                 const [quarter, yearOffset] = selector.value.split('-').map(Number);
                 const quarterKey = `${quarter}-${yearOffset}`;
                 quarterRateMap.set(quarterKey, parseFloat(rateInput.value));
             }
         });
         
-        // Get current fiscal quarter info to determine the starting point
+        // Get current date info
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1;
-        let currentFiscalQuarter;
-        if (currentMonth >= 4 && currentMonth <= 6) {
-            currentFiscalQuarter = 1;
-        } else if (currentMonth >= 7 && currentMonth <= 9) {
-            currentFiscalQuarter = 2;
-        } else if (currentMonth >= 10 && currentMonth <= 12) {
-            currentFiscalQuarter = 3;
-        } else {
-            currentFiscalQuarter = 4;
-        }
+        const currentYear = currentDate.getFullYear();
         
+        // Create monthly rates array by mapping each loan month to its fiscal quarter
+        const monthlyRates = [];
         let currentRate = initialRate;
         
-        // Fill quarterly rates array
-        for (let monthIndex = 0; monthIndex < totalQuarters * 3; monthIndex += 3) {
-            const quarterOffset = Math.floor(monthIndex / 3);
-            const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
-            const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4 + 1;
-            const quarterKey = `${quarterIndex}-${yearOffset}`;
+        for (let month = 1; month <= totalMonths; month++) {
+            // Calculate the actual calendar month and year for this loan month
+            const totalMonthsFromStart = (currentMonth - 1) + (month - 1);
+            const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+            const actualMonth = (totalMonthsFromStart % 12) + 1;
             
-            // Check if we have a rate specified for this quarter
+            // Determine fiscal quarter and year for this actual month
+            let fiscalQuarter, fiscalYear, yearOffset;
+            if (actualMonth >= 4 && actualMonth <= 6) {
+                fiscalQuarter = 1; // Q1: Apr-Jun
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 7 && actualMonth <= 9) {
+                fiscalQuarter = 2; // Q2: Jul-Sep
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 10 && actualMonth <= 12) {
+                fiscalQuarter = 3; // Q3: Oct-Dec
+                fiscalYear = actualYear;
+            } else {
+                fiscalQuarter = 4; // Q4: Jan-Mar
+                fiscalYear = actualYear - 1; // Jan-Mar belongs to previous fiscal year
+            }
+            
+            // Calculate year offset from current year
+            yearOffset = fiscalYear - currentYear;
+            const quarterKey = `${fiscalQuarter}-${yearOffset}`;
+            
+            // Check if there's a rate change for this fiscal quarter
             if (quarterRateMap.has(quarterKey)) {
                 currentRate = quarterRateMap.get(quarterKey);
             }
             
-            quarterlyRates.push(currentRate);
+            monthlyRates.push(currentRate);
         }
-
+        
+        // Convert monthly rates back to quarterly format for compatibility
+        const quarterlyRates = [];
+        for (let i = 0; i < monthlyRates.length; i += 3) {
+            quarterlyRates.push(monthlyRates[i]);
+        }
+        
         return quarterlyRates;
     }
 
-    performFloatingLoanCalculations(principal, quarterlyRates, tenureYears) {
+    getFloatingMonthlyRates(initialRate, tenureYears) {
+        const quarterInputGroups = this.quarterlyRatesContainer.querySelectorAll('.quarter-input-group');
+        const totalMonths = tenureYears * 12;
+        
+        // Create a map of selected quarters to their rates
+        const quarterRateMap = new Map();
+        
+        quarterInputGroups.forEach(group => {
+            const selector = group.querySelector('.quarter-selector');
+            const rateInput = group.querySelector('.quarter-rate');
+            
+            if (selector.value && rateInput.value && !isNaN(parseFloat(rateInput.value))) {
+                const [quarter, yearOffset] = selector.value.split('-').map(Number);
+                const quarterKey = `${quarter}-${yearOffset}`;
+                quarterRateMap.set(quarterKey, parseFloat(rateInput.value));
+            }
+        });
+        
+        // Get current date info
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        // Create monthly rates array by mapping each loan month to its fiscal quarter
+        const monthlyRates = [];
+        let currentRate = initialRate;
+        
+        for (let month = 1; month <= totalMonths; month++) {
+            // Calculate the actual calendar month and year for this loan month
+            const totalMonthsFromStart = (currentMonth - 1) + (month - 1);
+            const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+            const actualMonth = (totalMonthsFromStart % 12) + 1;
+            
+            // Determine fiscal quarter and year for this actual month
+            let fiscalQuarter, fiscalYear, yearOffset;
+            if (actualMonth >= 4 && actualMonth <= 6) {
+                fiscalQuarter = 1; // Q1: Apr-Jun
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 7 && actualMonth <= 9) {
+                fiscalQuarter = 2; // Q2: Jul-Sep
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 10 && actualMonth <= 12) {
+                fiscalQuarter = 3; // Q3: Oct-Dec
+                fiscalYear = actualYear;
+            } else {
+                fiscalQuarter = 4; // Q4: Jan-Mar
+                fiscalYear = actualYear - 1; // Jan-Mar belongs to previous fiscal year
+            }
+            
+            // Calculate year offset from current year
+            yearOffset = fiscalYear - currentYear;
+            const quarterKey = `${fiscalQuarter}-${yearOffset}`;
+            
+            // Check if there's a rate change for this fiscal quarter
+            if (quarterRateMap.has(quarterKey)) {
+                currentRate = quarterRateMap.get(quarterKey);
+            }
+            
+            monthlyRates.push(currentRate);
+        }
+        
+        return monthlyRates;
+    }
+
+    performFloatingLoanCalculations(principal, quarterlyRates, tenureYears, initialRate) {
         const totalMonths = tenureYears * 12;
         const schedule = [];
         let remainingBalance = principal;
         let totalInterestPaid = 0;
         let totalAmountPaid = 0;
 
+        // Get monthly rates directly instead of using quarterly index mapping
+        const monthlyRates = this.getFloatingMonthlyRates(initialRate, tenureYears);
+
         for (let month = 1; month <= totalMonths; month++) {
-            // Map calendar month to fiscal quarter
-            const fiscalQuarterIndex = this.getfiscalQuarterIndex(month);
-            const currentQuarterRate = quarterlyRates[Math.min(fiscalQuarterIndex, quarterlyRates.length - 1)];
+            const currentQuarterRate = monthlyRates[month - 1] || monthlyRates[monthlyRates.length - 1];
             const monthlyRate = (currentQuarterRate / 100) / 12;
             const dailyRate = (currentQuarterRate / 100) / 365;
             
@@ -651,11 +754,8 @@ class LoanCalculator {
             currentFiscalQuarter = 4; // Q4: Jan-Mar
         }
         
-        // Calculate how many months into the loan we are
-        const loanYear = Math.floor((calendarMonth - 1) / 12);
-        const monthInLoanYear = ((calendarMonth - 1) % 12) + 1;
-        
-        // Calculate which quarter this month falls into, starting from current fiscal quarter
+        // Calculate which quarter this month falls into based on the loan timeline
+        // Month 1 is the current month, so we need to map it to quarter 0 in our rates array
         const monthsFromStart = calendarMonth - 1;
         const quarterFromStart = Math.floor(monthsFromStart / 3);
         
@@ -665,82 +765,88 @@ class LoanCalculator {
     getFiscalQuarterDisplayInfo(calendarMonth) {
         // Get current date info
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
+        const currentMonth = currentDate.getMonth() + 1; // 1-12
+        const currentYear = currentDate.getFullYear();
         
-        // Determine current fiscal quarter
-        let currentFiscalQuarter;
-        if (currentMonth >= 4 && currentMonth <= 6) {
-            currentFiscalQuarter = 1;
-        } else if (currentMonth >= 7 && currentMonth <= 9) {
-            currentFiscalQuarter = 2;
-        } else if (currentMonth >= 10 && currentMonth <= 12) {
-            currentFiscalQuarter = 3;
-        } else {
-            currentFiscalQuarter = 4;
+        // Calculate actual calendar month and year based on month offset
+        const totalMonthsFromStart = (currentMonth - 1) + (calendarMonth - 1);
+        const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+        const actualMonth = (totalMonthsFromStart % 12) + 1;
+        
+        // Determine fiscal quarter and year for this actual month
+        let fiscalQuarter, fiscalYear, fyLabel;
+        if (actualMonth >= 4 && actualMonth <= 6) {
+            fiscalQuarter = 'Q1';
+            fiscalYear = actualYear;
+        } else if (actualMonth >= 7 && actualMonth <= 9) {
+            fiscalQuarter = 'Q2';
+            fiscalYear = actualYear;
+        } else if (actualMonth >= 10 && actualMonth <= 12) {
+            fiscalQuarter = 'Q3';
+            fiscalYear = actualYear;
+        } else { // Jan, Feb, Mar
+            fiscalQuarter = 'Q4';
+            fiscalYear = actualYear - 1;
         }
         
-        // Calculate which quarter this calendar month represents
-        const monthsFromStart = calendarMonth - 1;
-        const quarterOffset = Math.floor(monthsFromStart / 3);
-        const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
-        const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4;
+        // Calculate fiscal year offset from current fiscal year
+        const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+        const fiscalYearOffset = fiscalYear - currentFiscalYear;
+        fyLabel = fiscalYearOffset === 0 ? 'FY1' : `FY${fiscalYearOffset + 1}`;
         
-        const fiscalQuarters = [
-            { quarter: 'Q1', period: 'Apr-Jun' },
-            { quarter: 'Q2', period: 'Jul-Sep' },
-            { quarter: 'Q3', period: 'Oct-Dec' },
-            { quarter: 'Q4', period: 'Jan-Mar' }
-        ];
-        
-        const quarterInfo = fiscalQuarters[quarterIndex];
-        const displayYear = yearOffset + 1;
+        const quarterPeriods = {
+            'Q1': 'Apr-Jun',
+            'Q2': 'Jul-Sep', 
+            'Q3': 'Oct-Dec',
+            'Q4': 'Jan-Mar'
+        };
         
         return { 
-            quarter: `${quarterInfo.quarter} FY${displayYear}`, 
-            period: quarterInfo.period 
+            quarter: `${fiscalQuarter} ${fyLabel}`, 
+            period: quarterPeriods[fiscalQuarter]
         };
     }
 
     getFiscalMonthInfo(calendarMonth) {
         // Get current date info
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
+        const currentMonth = currentDate.getMonth() + 1; // 1-12
+        const currentYear = currentDate.getFullYear();
         
-        // Determine current fiscal quarter and month within that quarter
-        let currentFiscalQuarter, currentFiscalMonthInQuarter;
-        if (currentMonth >= 4 && currentMonth <= 6) {
-            currentFiscalQuarter = 1;
-            currentFiscalMonthInQuarter = currentMonth - 3; // Apr=1, May=2, Jun=3
-        } else if (currentMonth >= 7 && currentMonth <= 9) {
-            currentFiscalQuarter = 2;
-            currentFiscalMonthInQuarter = currentMonth - 6; // Jul=1, Aug=2, Sep=3
-        } else if (currentMonth >= 10 && currentMonth <= 12) {
-            currentFiscalQuarter = 3;
-            currentFiscalMonthInQuarter = currentMonth - 9; // Oct=1, Nov=2, Dec=3
-        } else {
-            currentFiscalQuarter = 4;
-            currentFiscalMonthInQuarter = currentMonth + 3; // Jan=1, Feb=2, Mar=3
+        // Calculate actual calendar month and year based on month offset
+        const totalMonthsFromStart = (currentMonth - 1) + (calendarMonth - 1);
+        const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+        const actualMonth = (totalMonthsFromStart % 12) + 1;
+        
+        // Determine fiscal quarter and year for this actual month
+        let fiscalQuarter, fiscalYear, fyLabel;
+        if (actualMonth >= 4 && actualMonth <= 6) {
+            fiscalQuarter = 'Q1';
+            fiscalYear = actualYear;
+        } else if (actualMonth >= 7 && actualMonth <= 9) {
+            fiscalQuarter = 'Q2';
+            fiscalYear = actualYear;
+        } else if (actualMonth >= 10 && actualMonth <= 12) {
+            fiscalQuarter = 'Q3';
+            fiscalYear = actualYear;
+        } else { // Jan, Feb, Mar
+            fiscalQuarter = 'Q4';
+            fiscalYear = actualYear - 1;
         }
         
-        // Calculate which quarter and month this calendar month represents
-        const monthsFromStart = calendarMonth - 1;
-        const quarterOffset = Math.floor(monthsFromStart / 3);
-        const monthInQuarter = (monthsFromStart % 3) + 1;
-        const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
-        const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4;
+        // Calculate fiscal year offset from current fiscal year
+        const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+        const fiscalYearOffset = fiscalYear - currentFiscalYear;
+        fyLabel = fiscalYearOffset === 0 ? 'FY1' : `FY${fiscalYearOffset + 1}`;
         
-        const fiscalQuarters = [
-            { quarter: 'Q1', monthNames: ['Apr', 'May', 'Jun'] },
-            { quarter: 'Q2', monthNames: ['Jul', 'Aug', 'Sep'] },
-            { quarter: 'Q3', monthNames: ['Oct', 'Nov', 'Dec'] },
-            { quarter: 'Q4', monthNames: ['Jan', 'Feb', 'Mar'] }
+        const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
         ];
         
-        const quarterInfo = fiscalQuarters[quarterIndex];
-        const monthName = quarterInfo.monthNames[monthInQuarter - 1];
-        const displayYear = yearOffset + 1;
+        const monthName = monthNames[actualMonth - 1];
         
-        return `${monthName} (${quarterInfo.quarter} FY${displayYear})`;
+        return `${monthName.substring(0, 3)} (${fiscalQuarter} ${fyLabel})`;
     }
 
     performFixedLoanCalculations(principal, annualRate, tenureYears) {
@@ -1171,8 +1277,79 @@ class LoanCalculator {
 
     getMaxGainQuarterlyRates(initialRate, tenureYears) {
         const quarterInputGroups = this.maxGainQuarterlyRatesContainer.querySelectorAll('.quarter-input-group');
-        const totalQuarters = Math.ceil(tenureYears * 4);
+        const totalMonths = tenureYears * 12;
+        
+        // Create a map of selected quarters to their rates
+        const quarterRateMap = new Map();
+        
+        quarterInputGroups.forEach(group => {
+            const selector = group.querySelector('.quarter-selector');
+            const rateInput = group.querySelector('.quarter-rate');
+            
+            if (selector.value && rateInput.value && !isNaN(parseFloat(rateInput.value))) {
+                const [quarter, yearOffset] = selector.value.split('-').map(Number);
+                const quarterKey = `${quarter}-${yearOffset}`;
+                quarterRateMap.set(quarterKey, parseFloat(rateInput.value));
+                console.log(`Quarter mapping: ${selector.options[selector.selectedIndex].text} -> ${quarterKey} -> ${parseFloat(rateInput.value)}%`);
+            }
+        });
+        
+        // Get current date info
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        // Create monthly rates array by mapping each loan month to its fiscal quarter
+        const monthlyRates = [];
+        let currentRate = initialRate;
+        
+        for (let month = 1; month <= totalMonths; month++) {
+            // Calculate the actual calendar month and year for this loan month
+            const totalMonthsFromStart = (currentMonth - 1) + (month - 1);
+            const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+            const actualMonth = (totalMonthsFromStart % 12) + 1;
+            
+            // Determine fiscal quarter and year for this actual month
+            let fiscalQuarter, fiscalYear, yearOffset;
+            if (actualMonth >= 4 && actualMonth <= 6) {
+                fiscalQuarter = 1; // Q1: Apr-Jun
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 7 && actualMonth <= 9) {
+                fiscalQuarter = 2; // Q2: Jul-Sep
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 10 && actualMonth <= 12) {
+                fiscalQuarter = 3; // Q3: Oct-Dec
+                fiscalYear = actualYear;
+            } else {
+                fiscalQuarter = 4; // Q4: Jan-Mar
+                fiscalYear = actualYear - 1; // Jan-Mar belongs to previous fiscal year
+            }
+            
+            // Calculate year offset from current year
+            yearOffset = fiscalYear - currentYear;
+            const quarterKey = `${fiscalQuarter}-${yearOffset}`;
+            
+            // Check if there's a rate change for this fiscal quarter
+            if (quarterRateMap.has(quarterKey)) {
+                currentRate = quarterRateMap.get(quarterKey);
+                console.log(`Month ${month} (${actualMonth}/${actualYear}): Applied rate ${currentRate}% from ${quarterKey}`);
+            }
+            
+            monthlyRates.push(currentRate);
+        }
+        
+        // Convert monthly rates back to quarterly format for compatibility
         const quarterlyRates = [];
+        for (let i = 0; i < monthlyRates.length; i += 3) {
+            quarterlyRates.push(monthlyRates[i]);
+        }
+        
+        return quarterlyRates;
+    }
+
+    getMaxGainMonthlyRates(initialRate, tenureYears) {
+        const quarterInputGroups = this.maxGainQuarterlyRatesContainer.querySelectorAll('.quarter-input-group');
+        const totalMonths = tenureYears * 12;
         
         // Create a map of selected quarters to their rates
         const quarterRateMap = new Map();
@@ -1188,37 +1365,51 @@ class LoanCalculator {
             }
         });
         
-        // Get current fiscal quarter info
+        // Get current date info
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1;
-        let currentFiscalQuarter;
-        if (currentMonth >= 4 && currentMonth <= 6) {
-            currentFiscalQuarter = 1;
-        } else if (currentMonth >= 7 && currentMonth <= 9) {
-            currentFiscalQuarter = 2;
-        } else if (currentMonth >= 10 && currentMonth <= 12) {
-            currentFiscalQuarter = 3;
-        } else {
-            currentFiscalQuarter = 4;
-        }
+        const currentYear = currentDate.getFullYear();
         
+        // Create monthly rates array by mapping each loan month to its fiscal quarter
+        const monthlyRates = [];
         let currentRate = initialRate;
         
-        // Fill quarterly rates array
-        for (let monthIndex = 0; monthIndex < totalQuarters * 3; monthIndex += 3) {
-            const quarterOffset = Math.floor(monthIndex / 3);
-            const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
-            const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4 + 1;
-            const quarterKey = `${quarterIndex}-${yearOffset}`;
+        for (let month = 1; month <= totalMonths; month++) {
+            // Calculate the actual calendar month and year for this loan month
+            const totalMonthsFromStart = (currentMonth - 1) + (month - 1);
+            const actualYear = currentYear + Math.floor(totalMonthsFromStart / 12);
+            const actualMonth = (totalMonthsFromStart % 12) + 1;
             
-            if (quarterRateMap.has(quarterKey)) {
-                currentRate = quarterRateMap.get(quarterKey);
+            // Determine fiscal quarter and year for this actual month
+            let fiscalQuarter, fiscalYear, yearOffset;
+            if (actualMonth >= 4 && actualMonth <= 6) {
+                fiscalQuarter = 1; // Q1: Apr-Jun
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 7 && actualMonth <= 9) {
+                fiscalQuarter = 2; // Q2: Jul-Sep
+                fiscalYear = actualYear;
+            } else if (actualMonth >= 10 && actualMonth <= 12) {
+                fiscalQuarter = 3; // Q3: Oct-Dec
+                fiscalYear = actualYear;
+            } else {
+                fiscalQuarter = 4; // Q4: Jan-Mar
+                fiscalYear = actualYear - 1; // Jan-Mar belongs to previous fiscal year
             }
             
-            quarterlyRates.push(currentRate);
+            // Calculate year offset from current year
+            yearOffset = fiscalYear - currentYear;
+            const quarterKey = `${fiscalQuarter}-${yearOffset}`;
+            
+            // Check if there's a rate change for this fiscal quarter
+            if (quarterRateMap.has(quarterKey)) {
+                currentRate = quarterRateMap.get(quarterKey);
+                console.log(`Month ${month} (${actualMonth}/${actualYear}): Applied rate ${currentRate}% from ${quarterKey}`);
+            }
+            
+            monthlyRates.push(currentRate);
         }
-
-        return quarterlyRates;
+        
+        return monthlyRates;
     }
 
     getAdditionalPayments() {
@@ -1265,9 +1456,12 @@ class LoanCalculator {
         let totalAmountPaid = 0;
         let overdraftAccount = 0;
 
+        // Get monthly rates directly instead of using quarterly index mapping
+        const initialRate = parseFloat(document.getElementById('maxGainInitialRate').value);
+        const monthlyRates = this.getMaxGainMonthlyRates(initialRate, tenureYears);
+
         for (let month = 1; month <= totalMonths; month++) {
-            const fiscalQuarterIndex = this.getfiscalQuarterIndex(month);
-            const currentQuarterRate = quarterlyRates[Math.min(fiscalQuarterIndex, quarterlyRates.length - 1)];
+            const currentQuarterRate = monthlyRates[month - 1] || monthlyRates[monthlyRates.length - 1];
             const monthlyRate = (currentQuarterRate / 100) / 12;
             const dailyRate = (currentQuarterRate / 100) / 365;
             
@@ -1347,9 +1541,9 @@ class LoanCalculator {
     }
 
     clearMaxGainForm() {
-        this.maxGainPrincipalInput.value = '';
-        this.maxGainInitialRateInput.value = '';
-        this.maxGainTenureInput.value = '';
+        this.maxGainPrincipalInput.value = '8000000';
+        this.maxGainInitialRateInput.value = '8.4';
+        this.maxGainTenureInput.value = '20';
         this.maxGainQuarterlyRatesContainer.innerHTML = '';
         this.additionalPaymentsContainer.innerHTML = '';
         this.withdrawalsContainer.innerHTML = '';
@@ -1367,10 +1561,10 @@ class LoanCalculator {
     }
 
     clearFixedForm() {
-        // Clear inputs
-        this.principalInput.value = '';
-        this.interestRateInput.value = '';
-        this.tenureInput.value = '';
+        // Reset to default values
+        this.principalInput.value = '8000000';
+        this.interestRateInput.value = '8.4';
+        this.tenureInput.value = '20';
 
         // Remove error classes
         [this.principalInput, this.interestRateInput, this.tenureInput].forEach(input => {
@@ -1385,10 +1579,10 @@ class LoanCalculator {
     }
 
     clearFloatingForm() {
-        // Clear inputs
-        this.floatingPrincipalInput.value = '';
-        this.initialInterestRateInput.value = '';
-        this.floatingTenureInput.value = '';
+        // Reset to default values
+        this.floatingPrincipalInput.value = '8000000';
+        this.initialInterestRateInput.value = '8.4';
+        this.floatingTenureInput.value = '20';
 
         // Clear quarterly rates
         this.quarterlyRatesContainer.innerHTML = '';
