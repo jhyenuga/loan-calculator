@@ -1089,10 +1089,84 @@ class LoanCalculator {
         const additionalPayments = this.getAdditionalPayments();
         const withdrawals = this.getWithdrawals();
         
+        // Validate withdrawals against overdraft account balance
+        const validationResult = this.validateWithdrawals(additionalPayments, withdrawals, tenureYears);
+        if (!validationResult.isValid) {
+            alert(validationResult.errorMessage);
+            return;
+        }
+        
         const loanDetails = this.performMaxGainCalculations(principal, quarterlyRates, tenureYears, additionalPayments, withdrawals);
         
         // Display results
         this.displayResults(loanDetails);
+    }
+
+    validateWithdrawals(additionalPayments, withdrawals, tenureYears) {
+        const totalMonths = tenureYears * 12;
+        let overdraftBalance = 0;
+        
+        for (let month = 1; month <= totalMonths; month++) {
+            const additionalPayment = additionalPayments.get(month) || 0;
+            const withdrawal = withdrawals.get(month) || 0;
+            
+            // Update overdraft balance with additional payment
+            overdraftBalance += additionalPayment;
+            
+            // Check if withdrawal exceeds available overdraft balance
+            if (withdrawal > overdraftBalance) {
+                const monthName = this.getMonthDisplayName(month);
+                return {
+                    isValid: false,
+                    errorMessage: `Invalid withdrawal in ${monthName}: ₹${this.formatNumber(withdrawal)} exceeds available overdraft balance of ₹${this.formatNumber(overdraftBalance)}. Please reduce the withdrawal amount or add more payments in earlier months.`
+                };
+            }
+            
+            // Apply withdrawal
+            overdraftBalance -= withdrawal;
+        }
+        
+        return { isValid: true };
+    }
+
+    getMonthDisplayName(monthNumber) {
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        // Calculate which fiscal month this represents
+        let fiscalYear = currentYear;
+        let fiscalMonth;
+        
+        // Fiscal year starts in April
+        if (currentMonth >= 4) {
+            fiscalMonth = currentMonth - 3 + (monthNumber - 1);
+        } else {
+            fiscalYear = currentYear - 1;
+            fiscalMonth = currentMonth + 9 + (monthNumber - 1);
+        }
+        
+        const adjustedYear = fiscalYear + Math.floor((fiscalMonth - 1) / 12);
+        const adjustedMonth = ((fiscalMonth - 1) % 12) + 1;
+        
+        const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        
+        // Convert to fiscal month
+        let displayMonth;
+        if (adjustedMonth >= 4) {
+            displayMonth = adjustedMonth;
+        } else {
+            displayMonth = adjustedMonth;
+        }
+        
+        return `Month ${monthNumber} - ${monthNames[((monthNumber - 1 + 3) % 12)]} ${adjustedYear}`;
+    }
+
+    formatNumber(amount) {
+        return new Intl.NumberFormat('en-IN').format(Math.round(amount));
     }
 
     getMaxGainQuarterlyRates(initialRate, tenureYears) {
@@ -1223,18 +1297,14 @@ class LoanCalculator {
             // Get withdrawal for this month
             const withdrawal = withdrawals.get(month) || 0;
             
-            // Calculate total principal payment
+            // Calculate total principal payment (additional payments reduce loan, withdrawals don't)
             const totalPrincipalPayment = regularPrincipalPayment + additionalPayment;
             
-            // Update overdraft account
+            // Update overdraft account (validation ensures this won't go negative)
             overdraftAccount += additionalPayment - withdrawal;
             
-            // Ensure overdraft account doesn't go negative
-            if (overdraftAccount < 0) {
-                overdraftAccount = 0;
-            }
-            
-            const closingBalance = Math.max(0, openingBalance - totalPrincipalPayment);
+            // Withdrawals are added back to closing balance (money comes back to you)
+            const closingBalance = Math.max(0, openingBalance - totalPrincipalPayment + withdrawal);
 
             // Get fiscal quarter and month info
             const fiscalQuarterInfo = this.getFiscalQuarterDisplayInfo(month);
@@ -1256,7 +1326,7 @@ class LoanCalculator {
             });
 
             totalInterestPaid += adjustedMonthlyInterest;
-            totalAmountPaid += emi + additionalPayment - withdrawal;
+            totalAmountPaid += emi + additionalPayment; // withdrawals don't count as loan payments
             remainingBalance = closingBalance;
 
             if (remainingBalance <= 0.01) {
