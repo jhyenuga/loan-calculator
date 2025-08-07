@@ -123,6 +123,32 @@ header p {
     background: #a0aec0;
 }
 
+/* Max Gain Calculator quarterly rates container with scroll */
+#maxGainQuarterlyRatesContainer {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    padding-right: 5px;
+}
+
+#maxGainQuarterlyRatesContainer::-webkit-scrollbar {
+    width: 8px;
+}
+
+#maxGainQuarterlyRatesContainer::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#maxGainQuarterlyRatesContainer::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+#maxGainQuarterlyRatesContainer::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
 .quarter-input-group {
     display: grid;
     grid-template-columns: 1fr 2fr auto;

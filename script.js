@@ -12,8 +12,10 @@ class LoanCalculator {
         // Tab elements
         this.fixedRateTab = document.getElementById('fixedRateTab');
         this.floatingRateTab = document.getElementById('floatingRateTab');
+        this.maxGainTab = document.getElementById('maxGainTab');
         this.fixedRateSection = document.getElementById('fixedRateSection');
         this.floatingRateSection = document.getElementById('floatingRateSection');
+        this.maxGainSection = document.getElementById('maxGainSection');
 
         // Fixed rate elements
         this.principalInput = document.getElementById('principal');
@@ -31,6 +33,19 @@ class LoanCalculator {
         this.quarterlyRatesContainer = document.getElementById('quarterlyRatesContainer');
         this.addQuarterBtn = document.getElementById('addQuarterBtn');
 
+        // Max Gain Calculator elements
+        this.maxGainPrincipalInput = document.getElementById('maxGainPrincipal');
+        this.maxGainInitialRateInput = document.getElementById('maxGainInitialRate');
+        this.maxGainTenureInput = document.getElementById('maxGainTenure');
+        this.calculateMaxGainBtn = document.getElementById('calculateMaxGainBtn');
+        this.clearMaxGainBtn = document.getElementById('clearMaxGainBtn');
+        this.maxGainQuarterlyRatesContainer = document.getElementById('maxGainQuarterlyRatesContainer');
+        this.addMaxGainQuarterBtn = document.getElementById('addMaxGainQuarterBtn');
+        this.additionalPaymentsContainer = document.getElementById('additionalPaymentsContainer');
+        this.addPaymentBtn = document.getElementById('addPaymentBtn');
+        this.withdrawalsContainer = document.getElementById('withdrawalsContainer');
+        this.addWithdrawalBtn = document.getElementById('addWithdrawalBtn');
+
         // Results elements
         this.resultsSection = document.getElementById('resultsSection');
         this.monthlyEMIElement = document.getElementById('monthlyEMI');
@@ -43,6 +58,7 @@ class LoanCalculator {
         // Tab switching
         this.fixedRateTab.addEventListener('click', () => this.switchToFixedRate());
         this.floatingRateTab.addEventListener('click', () => this.switchToFloatingRate());
+        this.maxGainTab.addEventListener('click', () => this.switchToMaxGain());
 
         // Fixed rate calculator
         this.calculateBtn.addEventListener('click', () => this.calculateFixedLoan());
@@ -53,6 +69,14 @@ class LoanCalculator {
         this.clearFloatingBtn.addEventListener('click', () => this.clearFloatingForm());
         this.addQuarterBtn.addEventListener('click', () => this.addQuarterInput());
         this.floatingTenureInput.addEventListener('input', () => this.updateQuarterInputs());
+
+        // Max Gain Calculator
+        this.calculateMaxGainBtn.addEventListener('click', () => this.calculateMaxGain());
+        this.clearMaxGainBtn.addEventListener('click', () => this.clearMaxGainForm());
+        this.addMaxGainQuarterBtn.addEventListener('click', () => this.addMaxGainQuarterInput());
+        this.addPaymentBtn.addEventListener('click', () => this.addPaymentInput());
+        this.addWithdrawalBtn.addEventListener('click', () => this.addWithdrawalInput());
+        this.maxGainTenureInput.addEventListener('input', () => this.updateMaxGainQuarterInputs());
 
         // Allow Enter key to trigger calculation for fixed rate
         [this.principalInput, this.interestRateInput, this.tenureInput].forEach(input => {
@@ -82,17 +106,32 @@ class LoanCalculator {
     switchToFixedRate() {
         this.fixedRateTab.classList.add('active');
         this.floatingRateTab.classList.remove('active');
+        this.maxGainTab.classList.remove('active');
         this.fixedRateSection.style.display = 'block';
         this.floatingRateSection.style.display = 'none';
+        this.maxGainSection.style.display = 'none';
         this.resultsSection.classList.remove('show');
     }
 
     switchToFloatingRate() {
         this.floatingRateTab.classList.add('active');
         this.fixedRateTab.classList.remove('active');
+        this.maxGainTab.classList.remove('active');
         this.floatingRateSection.style.display = 'block';
         this.fixedRateSection.style.display = 'none';
+        this.maxGainSection.style.display = 'none';
         this.resultsSection.classList.remove('show');
+    }
+
+    switchToMaxGain() {
+        this.maxGainTab.classList.add('active');
+        this.fixedRateTab.classList.remove('active');
+        this.floatingRateTab.classList.remove('active');
+        this.maxGainSection.style.display = 'block';
+        this.fixedRateSection.style.display = 'none';
+        this.floatingRateSection.style.display = 'none';
+        this.resultsSection.classList.remove('show');
+        this.initializeMaxGainInputs();
     }
 
     initializeFloatingRateInputs() {
@@ -207,6 +246,47 @@ class LoanCalculator {
             
             quarters.forEach(quarter => {
                 options.push(`<option value="${quarter.value}" data-period="${quarter.period}">${quarter.label}</option>`);
+            });
+        }
+        
+        return options.join('');
+    }
+
+    generateFiscalMonthOptions(maxTenure = 5) {
+        const options = [];
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        
+        // Calculate maximum months based on tenure
+        const maxMonths = maxTenure * 12;
+        
+        // Generate fiscal months starting from April of current year
+        let monthCounter = 1;
+        for (let yearOffset = 0; yearOffset <= Math.ceil(maxTenure) && monthCounter <= maxMonths; yearOffset++) {
+            const fiscalYear = currentYear + yearOffset;
+            const fyLabel = yearOffset === 0 ? 'FY' : `FY Year ${yearOffset + 1}`;
+            
+            const fiscalMonths = [
+                { month: 4, name: 'April', year: fiscalYear },
+                { month: 5, name: 'May', year: fiscalYear },
+                { month: 6, name: 'June', year: fiscalYear },
+                { month: 7, name: 'July', year: fiscalYear },
+                { month: 8, name: 'August', year: fiscalYear },
+                { month: 9, name: 'September', year: fiscalYear },
+                { month: 10, name: 'October', year: fiscalYear },
+                { month: 11, name: 'November', year: fiscalYear },
+                { month: 12, name: 'December', year: fiscalYear },
+                { month: 1, name: 'January', year: fiscalYear + 1 },
+                { month: 2, name: 'February', year: fiscalYear + 1 },
+                { month: 3, name: 'March', year: fiscalYear + 1 }
+            ];
+            
+            fiscalMonths.forEach(monthInfo => {
+                if (monthCounter <= maxMonths) {
+                    const label = `${monthInfo.name} ${monthInfo.year} (${fyLabel})`;
+                    options.push(`<option value="${monthCounter}">${label}</option>`);
+                    monthCounter++;
+                }
             });
         }
         
@@ -730,7 +810,7 @@ class LoanCalculator {
 
     displayResults(loanDetails) {
         // Update summary cards
-        if (loanDetails.isFloating) {
+        if (loanDetails.isFloating || loanDetails.isMaxGain) {
             this.monthlyEMIElement.textContent = this.formatCurrency(loanDetails.emi) + ' (Avg)';
         } else {
             this.monthlyEMIElement.textContent = this.formatCurrency(loanDetails.emi);
@@ -739,40 +819,85 @@ class LoanCalculator {
         this.totalInterestElement.textContent = this.formatCurrency(loanDetails.totalInterest);
 
         // Generate table
-        this.generateEMITable(loanDetails.schedule, loanDetails.isFloating);
+        this.generateEMITable(loanDetails.schedule, loanDetails.isFloating, loanDetails.isMaxGain);
 
         // Show results section
         this.resultsSection.classList.add('show');
         this.resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 
-    generateEMITable(schedule, isFloating = false) {
+    generateEMITable(schedule, isFloating = false, isMaxGain = false) {
         this.emiTableBody.innerHTML = '';
 
-        // Update table header if needed for floating rate specific columns
+        // Update table header based on calculator type
         const tableHeader = document.querySelector('#emiTable thead tr');
-        if (isFloating && !tableHeader.querySelector('.fiscal-quarter-column')) {
-            // For floating rate, insert fiscal quarter right after fiscal month (position 2)
+        
+        // Remove existing dynamic columns
+        const existingDynamicCols = tableHeader.querySelectorAll('.fiscal-quarter-column, .rate-column, .additional-payment-column, .withdrawal-column, .overdraft-column');
+        existingDynamicCols.forEach(col => col.remove());
+
+        if (isMaxGain) {
+            // For Max Gain, add all columns
             const fiscalQuarterHeader = document.createElement('th');
             fiscalQuarterHeader.textContent = 'Fiscal Quarter';
             fiscalQuarterHeader.className = 'fiscal-quarter-column';
-            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]); // Insert after Fiscal Month
+            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]);
             
             const rateHeader = document.createElement('th');
             rateHeader.textContent = 'Rate (%)';
             rateHeader.className = 'rate-column';
-            tableHeader.insertBefore(rateHeader, tableHeader.children[4]); // Insert after Opening Balance, before EMI
-        } else if (!isFloating) {
-            const fiscalQuarterCol = tableHeader.querySelector('.fiscal-quarter-column');
-            const rateCol = tableHeader.querySelector('.rate-column');
-            if (fiscalQuarterCol) fiscalQuarterCol.remove();
-            if (rateCol) rateCol.remove();
+            tableHeader.insertBefore(rateHeader, tableHeader.children[4]);
+            
+            // Add additional payment column after Principal
+            const additionalPaymentHeader = document.createElement('th');
+            additionalPaymentHeader.textContent = 'Additional Payment';
+            additionalPaymentHeader.className = 'additional-payment-column';
+            tableHeader.insertBefore(additionalPaymentHeader, tableHeader.children[8]);
+            
+            // Add withdrawal column
+            const withdrawalHeader = document.createElement('th');
+            withdrawalHeader.textContent = 'Withdrawal';
+            withdrawalHeader.className = 'withdrawal-column';
+            tableHeader.insertBefore(withdrawalHeader, tableHeader.children[9]);
+            
+            // Add overdraft account column
+            const overdraftHeader = document.createElement('th');
+            overdraftHeader.textContent = 'Overdraft Account';
+            overdraftHeader.className = 'overdraft-column';
+            tableHeader.insertBefore(overdraftHeader, tableHeader.children[10]);
+            
+        } else if (isFloating) {
+            // For floating rate, just add fiscal quarter and rate
+            const fiscalQuarterHeader = document.createElement('th');
+            fiscalQuarterHeader.textContent = 'Fiscal Quarter';
+            fiscalQuarterHeader.className = 'fiscal-quarter-column';
+            tableHeader.insertBefore(fiscalQuarterHeader, tableHeader.children[2]);
+            
+            const rateHeader = document.createElement('th');
+            rateHeader.textContent = 'Rate (%)';
+            rateHeader.className = 'rate-column';
+            tableHeader.insertBefore(rateHeader, tableHeader.children[4]);
         }
 
         schedule.forEach(payment => {
             const row = document.createElement('tr');
             
-            if (isFloating) {
+            if (isMaxGain) {
+                row.innerHTML = `
+                    <td>${payment.month}</td>
+                    <td class="fiscal-month-cell">${payment.fiscalMonth}</td>
+                    <td><span class="fiscal-quarter-info">${payment.fiscalQuarter}</span></td>
+                    <td>${this.formatCurrency(payment.openingBalance)}</td>
+                    <td>${payment.interestRate.toFixed(2)}%</td>
+                    <td>${this.formatCurrency(payment.emi)}</td>
+                    <td>${this.formatCurrency(payment.interest)}</td>
+                    <td>${this.formatCurrency(payment.principal)}</td>
+                    <td>${this.formatCurrency(payment.additionalPayment || 0)}</td>
+                    <td>${this.formatCurrency(payment.withdrawal || 0)}</td>
+                    <td>${this.formatCurrency(payment.overdraftAccount || 0)}</td>
+                    <td>${this.formatCurrency(payment.closingBalance)}</td>
+                `;
+            } else if (isFloating) {
                 row.innerHTML = `
                     <td>${payment.month}</td>
                     <td class="fiscal-month-cell">${payment.fiscalMonth}</td>
@@ -798,6 +923,368 @@ class LoanCalculator {
             
             this.emiTableBody.appendChild(row);
         });
+    }
+
+    // Max Gain Calculator Methods
+    initializeMaxGainInputs() {
+        // Clear existing inputs
+        this.maxGainQuarterlyRatesContainer.innerHTML = '';
+        this.additionalPaymentsContainer.innerHTML = '';
+        this.withdrawalsContainer.innerHTML = '';
+        
+        // Add default quarter inputs
+        this.addMaxGainQuarterInput();
+        this.addMaxGainQuarterInput();
+    }
+
+    addMaxGainQuarterInput() {
+        this.quarterCounter++;
+        const quarterDiv = document.createElement('div');
+        quarterDiv.className = 'quarter-input-group';
+        
+        // Generate dropdown options for fiscal quarters
+        const fiscalQuarterOptions = this.generateFiscalQuarterOptions();
+        
+        quarterDiv.innerHTML = `
+            <div>
+                <label>Select Fiscal Quarter</label>
+                <select class="quarter-selector" data-quarter="${this.quarterCounter}" onchange="loanCalculator.updateQuarterInfo(this)">
+                    <option value="">Select Quarter...</option>
+                    ${fiscalQuarterOptions}
+                </select>
+                <small class="quarter-period" style="display: none;"></small>
+            </div>
+            <div>
+                <input type="number" class="quarter-rate" placeholder="Enter rate % (leave blank if unchanged)" 
+                       min="0.1" step="0.1" max="50" data-quarter="${this.quarterCounter}">
+            </div>
+            <div>
+                <button type="button" class="remove-quarter-btn" onclick="loanCalculator.removeQuarterInput(this)">Remove</button>
+            </div>
+        `;
+        this.maxGainQuarterlyRatesContainer.appendChild(quarterDiv);
+    }
+
+    addPaymentInput() {
+        const paymentDiv = document.createElement('div');
+        paymentDiv.className = 'quarter-input-group';
+        
+        // Get tenure to determine max months for dropdown
+        const tenure = parseFloat(this.maxGainTenureInput.value) || 5;
+        const fiscalMonthOptions = this.generateFiscalMonthOptions(tenure);
+        
+        paymentDiv.innerHTML = `
+            <div>
+                <label>Select Month</label>
+                <select class="payment-month" style="width: 100%;">
+                    <option value="">Select Month...</option>
+                    ${fiscalMonthOptions}
+                </select>
+            </div>
+            <div>
+                <input type="number" class="payment-amount" placeholder="Enter additional payment amount" min="0" step="1000">
+            </div>
+            <div>
+                <button type="button" class="remove-quarter-btn" onclick="loanCalculator.removePaymentInput(this)">Remove</button>
+            </div>
+        `;
+        this.additionalPaymentsContainer.appendChild(paymentDiv);
+    }
+
+    addWithdrawalInput() {
+        const withdrawalDiv = document.createElement('div');
+        withdrawalDiv.className = 'quarter-input-group';
+        
+        // Get tenure to determine max months for dropdown
+        const tenure = parseFloat(this.maxGainTenureInput.value) || 5;
+        const fiscalMonthOptions = this.generateFiscalMonthOptions(tenure);
+        
+        withdrawalDiv.innerHTML = `
+            <div>
+                <label>Select Month</label>
+                <select class="withdrawal-month" style="width: 100%;">
+                    <option value="">Select Month...</option>
+                    ${fiscalMonthOptions}
+                </select>
+            </div>
+            <div>
+                <input type="number" class="withdrawal-amount" placeholder="Enter withdrawal amount" min="0" step="1000">
+            </div>
+            <div>
+                <button type="button" class="remove-quarter-btn" onclick="loanCalculator.removeWithdrawalInput(this)">Remove</button>
+            </div>
+        `;
+        this.withdrawalsContainer.appendChild(withdrawalDiv);
+    }
+
+    removePaymentInput(button) {
+        const paymentDiv = button.closest('.quarter-input-group');
+        paymentDiv.remove();
+    }
+
+    removeWithdrawalInput(button) {
+        const withdrawalDiv = button.closest('.quarter-input-group');
+        withdrawalDiv.remove();
+    }
+
+    updateMaxGainQuarterInputs() {
+        const tenure = parseFloat(this.maxGainTenureInput.value);
+        if (tenure && tenure > 0) {
+            const requiredQuarters = Math.ceil(tenure * 4);
+            const currentQuarters = this.maxGainQuarterlyRatesContainer.querySelectorAll('.quarter-input-group').length;
+            
+            if (requiredQuarters > currentQuarters) {
+                for (let i = currentQuarters; i < requiredQuarters; i++) {
+                    this.addMaxGainQuarterInput();
+                }
+            }
+            
+            // Update existing fiscal month dropdowns
+            this.updateFiscalMonthDropdowns(tenure);
+        }
+    }
+
+    updateFiscalMonthDropdowns(tenure) {
+        const fiscalMonthOptions = this.generateFiscalMonthOptions(tenure);
+        
+        // Update additional payment dropdowns
+        const paymentSelects = this.additionalPaymentsContainer.querySelectorAll('.payment-month');
+        paymentSelects.forEach(select => {
+            const currentValue = select.value;
+            select.innerHTML = `<option value="">Select Month...</option>${fiscalMonthOptions}`;
+            if (currentValue && currentValue <= tenure * 12) {
+                select.value = currentValue;
+            }
+        });
+        
+        // Update withdrawal dropdowns
+        const withdrawalSelects = this.withdrawalsContainer.querySelectorAll('.withdrawal-month');
+        withdrawalSelects.forEach(select => {
+            const currentValue = select.value;
+            select.innerHTML = `<option value="">Select Month...</option>${fiscalMonthOptions}`;
+            if (currentValue && currentValue <= tenure * 12) {
+                select.value = currentValue;
+            }
+        });
+    }
+
+    calculateMaxGain() {
+        // Validate inputs
+        const principal = parseFloat(this.maxGainPrincipalInput.value);
+        const initialRate = parseFloat(this.maxGainInitialRateInput.value);
+        const tenureYears = parseFloat(this.maxGainTenureInput.value);
+
+        if (!principal || !initialRate || !tenureYears) {
+            alert('Please fill in all required fields (Principal Amount, Initial Interest Rate, and Loan Tenure).');
+            return;
+        }
+
+        if (principal <= 0 || initialRate <= 0 || tenureYears <= 0) {
+            alert('Please enter positive values for all fields.');
+            return;
+        }
+
+        // Get quarterly rates, additional payments, and withdrawals
+        const quarterlyRates = this.getMaxGainQuarterlyRates(initialRate, tenureYears);
+        const additionalPayments = this.getAdditionalPayments();
+        const withdrawals = this.getWithdrawals();
+        
+        const loanDetails = this.performMaxGainCalculations(principal, quarterlyRates, tenureYears, additionalPayments, withdrawals);
+        
+        // Display results
+        this.displayResults(loanDetails);
+    }
+
+    getMaxGainQuarterlyRates(initialRate, tenureYears) {
+        const quarterInputGroups = this.maxGainQuarterlyRatesContainer.querySelectorAll('.quarter-input-group');
+        const totalQuarters = Math.ceil(tenureYears * 4);
+        const quarterlyRates = [];
+        
+        // Create a map of selected quarters to their rates
+        const quarterRateMap = new Map();
+        
+        quarterInputGroups.forEach(group => {
+            const selector = group.querySelector('.quarter-selector');
+            const rateInput = group.querySelector('.quarter-rate');
+            
+            if (selector.value && rateInput.value && !isNaN(parseFloat(rateInput.value))) {
+                const [quarter, yearOffset] = selector.value.split('-').map(Number);
+                const quarterKey = `${quarter}-${yearOffset}`;
+                quarterRateMap.set(quarterKey, parseFloat(rateInput.value));
+            }
+        });
+        
+        // Get current fiscal quarter info
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        let currentFiscalQuarter;
+        if (currentMonth >= 4 && currentMonth <= 6) {
+            currentFiscalQuarter = 1;
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            currentFiscalQuarter = 2;
+        } else if (currentMonth >= 10 && currentMonth <= 12) {
+            currentFiscalQuarter = 3;
+        } else {
+            currentFiscalQuarter = 4;
+        }
+        
+        let currentRate = initialRate;
+        
+        // Fill quarterly rates array
+        for (let monthIndex = 0; monthIndex < totalQuarters * 3; monthIndex += 3) {
+            const quarterOffset = Math.floor(monthIndex / 3);
+            const yearOffset = Math.floor((currentFiscalQuarter - 1 + quarterOffset) / 4);
+            const quarterIndex = (currentFiscalQuarter - 1 + quarterOffset) % 4 + 1;
+            const quarterKey = `${quarterIndex}-${yearOffset}`;
+            
+            if (quarterRateMap.has(quarterKey)) {
+                currentRate = quarterRateMap.get(quarterKey);
+            }
+            
+            quarterlyRates.push(currentRate);
+        }
+
+        return quarterlyRates;
+    }
+
+    getAdditionalPayments() {
+        const paymentInputs = this.additionalPaymentsContainer.querySelectorAll('.quarter-input-group');
+        const payments = new Map();
+        
+        paymentInputs.forEach(group => {
+            const monthInput = group.querySelector('.payment-month');
+            const amountInput = group.querySelector('.payment-amount');
+            
+            if (monthInput.value && amountInput.value && !isNaN(parseFloat(amountInput.value))) {
+                const month = parseInt(monthInput.value);
+                const amount = parseFloat(amountInput.value);
+                payments.set(month, amount);
+            }
+        });
+        
+        return payments;
+    }
+
+    getWithdrawals() {
+        const withdrawalInputs = this.withdrawalsContainer.querySelectorAll('.quarter-input-group');
+        const withdrawals = new Map();
+        
+        withdrawalInputs.forEach(group => {
+            const monthInput = group.querySelector('.withdrawal-month');
+            const amountInput = group.querySelector('.withdrawal-amount');
+            
+            if (monthInput.value && amountInput.value && !isNaN(parseFloat(amountInput.value))) {
+                const month = parseInt(monthInput.value);
+                const amount = parseFloat(amountInput.value);
+                withdrawals.set(month, amount);
+            }
+        });
+        
+        return withdrawals;
+    }
+
+    performMaxGainCalculations(principal, quarterlyRates, tenureYears, additionalPayments, withdrawals) {
+        const totalMonths = tenureYears * 12;
+        const schedule = [];
+        let remainingBalance = principal;
+        let totalInterestPaid = 0;
+        let totalAmountPaid = 0;
+        let overdraftAccount = 0;
+
+        for (let month = 1; month <= totalMonths; month++) {
+            const fiscalQuarterIndex = this.getfiscalQuarterIndex(month);
+            const currentQuarterRate = quarterlyRates[Math.min(fiscalQuarterIndex, quarterlyRates.length - 1)];
+            const monthlyRate = (currentQuarterRate / 100) / 12;
+            const dailyRate = (currentQuarterRate / 100) / 365;
+            
+            const openingBalance = remainingBalance;
+            
+            // Calculate remaining months for EMI calculation
+            const remainingMonths = totalMonths - month + 1;
+            
+            // Calculate EMI for remaining tenure with current rate
+            let emi;
+            if (remainingMonths === 1) {
+                emi = remainingBalance + (remainingBalance * monthlyRate);
+            } else {
+                emi = (remainingBalance * monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) / 
+                      (Math.pow(1 + monthlyRate, remainingMonths) - 1);
+            }
+            
+            // Calculate interest
+            const daysInMonth = 30;
+            const adjustedMonthlyInterest = openingBalance * (dailyRate * daysInMonth);
+            
+            const regularPrincipalPayment = emi - adjustedMonthlyInterest;
+            
+            // Get additional payment for this month
+            const additionalPayment = additionalPayments.get(month) || 0;
+            
+            // Get withdrawal for this month
+            const withdrawal = withdrawals.get(month) || 0;
+            
+            // Calculate total principal payment
+            const totalPrincipalPayment = regularPrincipalPayment + additionalPayment;
+            
+            // Update overdraft account
+            overdraftAccount += additionalPayment - withdrawal;
+            
+            // Ensure overdraft account doesn't go negative
+            if (overdraftAccount < 0) {
+                overdraftAccount = 0;
+            }
+            
+            const closingBalance = Math.max(0, openingBalance - totalPrincipalPayment);
+
+            // Get fiscal quarter and month info
+            const fiscalQuarterInfo = this.getFiscalQuarterDisplayInfo(month);
+            const fiscalMonthInfo = this.getFiscalMonthInfo(month);
+
+            schedule.push({
+                month: month,
+                fiscalMonth: fiscalMonthInfo,
+                fiscalQuarter: fiscalQuarterInfo.quarter,
+                interestRate: currentQuarterRate,
+                openingBalance: openingBalance,
+                emi: emi,
+                interest: adjustedMonthlyInterest,
+                principal: regularPrincipalPayment,
+                additionalPayment: additionalPayment,
+                withdrawal: withdrawal,
+                overdraftAccount: overdraftAccount,
+                closingBalance: closingBalance
+            });
+
+            totalInterestPaid += adjustedMonthlyInterest;
+            totalAmountPaid += emi + additionalPayment - withdrawal;
+            remainingBalance = closingBalance;
+
+            if (remainingBalance <= 0.01) {
+                break;
+            }
+        }
+
+        const averageEMI = schedule.reduce((sum, payment) => sum + payment.emi, 0) / schedule.length;
+
+        return {
+            emi: averageEMI,
+            totalAmount: totalAmountPaid,
+            totalInterest: totalInterestPaid,
+            schedule: schedule,
+            isFloating: true,
+            isMaxGain: true
+        };
+    }
+
+    clearMaxGainForm() {
+        this.maxGainPrincipalInput.value = '';
+        this.maxGainInitialRateInput.value = '';
+        this.maxGainTenureInput.value = '';
+        this.maxGainQuarterlyRatesContainer.innerHTML = '';
+        this.additionalPaymentsContainer.innerHTML = '';
+        this.withdrawalsContainer.innerHTML = '';
+        this.resultsSection.classList.remove('show');
+        this.quarterCounter = 0;
     }
 
     formatCurrency(amount) {
