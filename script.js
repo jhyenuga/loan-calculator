@@ -1,8 +1,10 @@
 // Enhanced Loan Calculator with Fixed and Floating Interest Rates
+// Version 2.0 - With Fiscal Quarter Mapping Fix
 
 class LoanCalculator {
     constructor() {
         this.quarterCounter = 0;
+        console.log('Loan Calculator v2.0 initialized with fiscal quarter fix');
         this.initializeElements();
         this.attachEventListeners();
         this.initializeFloatingRateInputs();
