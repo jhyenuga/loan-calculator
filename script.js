@@ -1,5 +1,6 @@
 // Enhanced Loan Calculator with Fixed and Floating Interest Rates
 // Version 2.0 - With Fiscal Quarter Mapping Fix
+// Updated: 07 August 2025 19:16:20
 
 class LoanCalculator {
     constructor() {
